@@ -1,5 +1,4 @@
 import tkinter as tk
-from tkinter import filedialog
 import cv2
 from PIL import Image, ImageTk
 import numpy as np
@@ -43,7 +42,7 @@ class ImageSegmentationApp:
         self.load_button.pack(side=tk.LEFT, expand=True, fill=tk.X)
 
     def load_image(self):
-        file_path = filedialog.askopenfilename(initialdir="./images", title="Select Image",
+        file_path = tk.filedialog.askopenfilename(initialdir="./images", title="Select Image",
                                                 filetypes=(("JPEG files", "*.jpg"), ("PNG files", "*.png"),
                                                            ("All files", "*.*")))
         if file_path:
@@ -136,11 +135,11 @@ class ImageSegmentationApp:
 
         gauss_contours = blurred - image
 
-        # Opening
+        # opening
         erosion = cv2.erode(gauss_contours, np.ones((3, 3), np.uint8), iterations=2)
         dilation = cv2.dilate(erosion, np.ones((2, 2), np.uint8), iterations=6)
 
-        # Find contours
+        # find components
         _, labels, stats, _ = cv2.connectedComponentsWithStats(dilation, 4)
         labels = np.unique(labels)
         threshold_S = 10
