@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import filedialog
 import cv2
 from PIL import Image, ImageTk
 import numpy as np
@@ -42,7 +43,7 @@ class ImageSegmentationApp:
         self.load_button.pack(side=tk.LEFT, expand=True, fill=tk.X)
 
     def load_image(self):
-        file_path = tk.filedialog.askopenfilename(initialdir="./images", title="Select Image",
+        file_path = filedialog.askopenfilename(initialdir="./images", title="Select Image",
                                                 filetypes=(("JPEG files", "*.jpg"), ("PNG files", "*.png"),
                                                            ("All files", "*.*")))
         if file_path:

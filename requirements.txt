@@ -1,7 +1,5 @@
 numpy
-python-opencv
-tkinter
+opencv-python
+tk
 matplotlib
 pillow
-jupyter
-jupyterlab
