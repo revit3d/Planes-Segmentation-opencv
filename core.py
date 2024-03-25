@@ -42,6 +42,12 @@ class ImageSegmentationApp:
                                      font=self.button_font)
         self.load_button.pack(side=tk.LEFT, expand=True, fill=tk.X)
 
+        self.load_button = tk.Button(self.root,
+                                     text="Process Image using\nOtsu thresholding",
+                                     command=self.process_image_otsu,
+                                     font=self.button_font)
+        self.load_button.pack(side=tk.LEFT, expand=True, fill=tk.X)
+
     def load_image(self):
         file_path = filedialog.askopenfilename(initialdir="./images", title="Select Image",
                                                 filetypes=(("JPEG files", "*.jpg"), ("PNG files", "*.png"),
@@ -106,13 +112,13 @@ class ImageSegmentationApp:
 
         image = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
 
-        # reduce noise in the image
-        image = cv2.GaussianBlur(image, (9, 9), 0)
+        # reduce noise
+        image = cv2.GaussianBlur(image, (5, 5), 0)
 
         kernel = np.ones((5, 5), np.uint8)
         image = cv2.morphologyEx(image, cv2.MORPH_CLOSE, kernel)
 
-        edges = cv2.Canny(image, 50, 200)
+        edges = cv2.Canny(image, 120, 350)
         contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         # create a blank mask to store the segmented objects
@@ -130,25 +136,81 @@ class ImageSegmentationApp:
             return None
 
         image = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+
+        # reduce noise
         image = cv2.GaussianBlur(image, (31, 31), 0)
 
         blurred = cv2.GaussianBlur(image, (9, 9), 0)
 
+        # find robust contours
         gauss_contours = blurred - image
 
         # opening
-        erosion = cv2.erode(gauss_contours, np.ones((3, 3), np.uint8), iterations=2)
-        dilation = cv2.dilate(erosion, np.ones((2, 2), np.uint8), iterations=6)
+        erosion = cv2.erode(gauss_contours,
+                            kernel=np.ones((3, 3), np.uint8),
+                            iterations=2)
+        dilation = cv2.dilate(erosion,
+                              kernel=np.ones((2, 2), np.uint8),
+                              iterations=6)
+        
+        # apply binary thresholding
+        _, thresh = cv2.threshold(dilation, 127, 255, cv2.THRESH_BINARY)
 
         # find components
-        _, labels, stats, _ = cv2.connectedComponentsWithStats(dilation, 4)
+        _, labels, stats, _ = cv2.connectedComponentsWithStats(thresh, 8)
         labels = np.unique(labels)
+
+        # draw rectangles for segmented objects, omitting too small objects
+        mask = cv2.cvtColor(thresh, cv2.COLOR_GRAY2RGB)
         threshold_S = 10
-        for label in labels:
-            if stats[label, cv2.CC_STAT_AREA] < threshold_S:
+        for i, label in enumerate(labels):
+            x, y, w, h, area = stats[i]
+            if area < threshold_S:
                 labels[labels == label] = 0
+            else:
+                cv2.rectangle(mask, (x, y), (x+w, y+h), (0, 255, 0), 2)
         labels = np.unique(labels)
-        self.processed_image = dilation
+
+        self.processed_image = mask
+        self.display_image(self.processed_image)
+        self.update_message(f'Approximate number of planes\non the image: {len(labels) - 1}')
+    
+    def process_image_otsu(self):
+        if self.image is None:
+            return None
+
+        image = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+
+        # reduce noise
+        image = cv2.GaussianBlur(image, (3, 3), 0)
+
+        se = cv2.getStructuringElement(cv2.MORPH_RECT, (40, 40))
+
+        bg = cv2.morphologyEx(image, cv2.MORPH_DILATE, kernel=se)
+
+        out_gray = cv2.divide(image, bg, scale=255)
+
+        # use otsu thresholding
+        _, out_binary = cv2.threshold(out_gray, 0, 255, cv2.THRESH_OTSU)
+
+        # erode for contours completing
+        erosion = cv2.erode(out_binary, np.ones((2, 2), np.uint8), iterations=2)
+
+        _, labels, stats, _ = cv2.connectedComponentsWithStats(erosion, 8)
+        labels = np.unique(labels)
+
+        # draw rectangles for segmented objects, omitting too small objects
+        mask = cv2.cvtColor(erosion, cv2.COLOR_GRAY2RGB)
+        threshold_S = 10
+        for i, label in enumerate(labels):
+            x, y, w, h, area = stats[i]
+            if area < threshold_S:
+                labels[labels == label] = 0
+            else:
+                cv2.rectangle(mask, (x, y), (x+w, y+h), (0, 255, 0), 2)
+        labels = np.unique(labels)
+
+        self.processed_image = mask
         self.display_image(self.processed_image)
         self.update_message(f'Approximate number of planes\non the image: {len(labels) - 1}')
 
